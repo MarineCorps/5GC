@@ -127,7 +127,7 @@ snssais:
     sd: 00007B # in hex
   - &kpm_slice
     sst: 1 
-    sd: ffffff # kpm slice
+    sd: ffffff # kpm slice xapp과 연동을 위해 슬라이스 추가
 ############## NF-specific configuration
 amf:
   amf_name: "OAI-AMF"

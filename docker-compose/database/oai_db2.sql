@@ -418,6 +418,7 @@ ALTER TABLE `SdmSubscriptions`
 
 
 -- (파일 맨 끝COMMIT; 바로 위에 추가)
+-- 접속할 사용자 단말 정보 추가 -- 
 
 INSERT INTO `AuthenticationSubscription` (`ueid`, `authenticationMethod`, `encPermanentKey`, `protectionParameterId`, `sequenceNumber`, `authenticationManagementField`, `algorithmId`, `encOpcKey`, `supi`) VALUES ('208950000007487', '5G_AKA', 'fec86ba6eb707ed08905757b1bb44b8f', '0C0A34601D4F07677303652C0462535B', '{\"sqn\": \"000000000020\", \"sqnScheme\": \"NON_TIME_BASED\", \"lastIndexes\": {\"ausf\": 0}}', '8000', 'milenage', 'C42449363BBAD02B66D16BC975D77CC1', '208950000007487');
 
@@ -427,7 +428,20 @@ INSERT INTO `SessionManagementSubscriptionData` (`ueid`, `servingPlmnid`, `singl
 
 INSERT INTO `SmfSelectionSubscriptionData` (`ueid`, `servingPlmnid`, `subscribedSnssaiInfos`) VALUES ('208950000007487', '20895', '{\"S-NSSAI\": {\"dnnInfos\": [{\"dnn\": \"oai\"}]}}');
 
+
+-- 새로운 단말 정보 추가 (nssai_sd = ffffff, IMSI = 208950000007488) --
+INSERT INTO `AuthenticationSubscription` (`ueid`, `authenticationMethod`, `encPermanentKey`, `protectionParameterId`, `sequenceNumber`, `authenticationManagementField`, `algorithmId`, `encOpcKey`, `supi`) VALUES ('208950000007488', '5G_AKA', 'fec86ba6eb707ed08905757b1bb44b8f', '0C0A34601D4F07677303652C0462535B', '{\"sqn\": \"000000000020\", \"sqnScheme\": \"NON_TIME_BASED\", \"lastIndexes\": {\"ausf\": 0}}', '8000', 'milenage', 'C42449363BBAD02B66D16BC975D77CC1', '208950000007488');
+
+INSERT INTO `AccessAndMobilitySubscriptionData` (`ueid`, `servingPlmnid`, `nssai`) VALUES ('208950000007488', '20895','{\"defaultSingleNssais\": [{\"sst\": 1, \"sd\": \"ffffff\"}]}');
+
+INSERT INTO `SessionManagementSubscriptionData` (`ueid`, `servingPlmnid`, `singleNssai`, `dnnConfigurations`) VALUES ('208950000007488', '20895', '{\"sst\": 1, \"sd\": \"ffffff\"}','{\"oai\":{\"pduSessionTypes\":{ \"defaultSessionType\": \"IPV4\"},\"sscModes\": {\"defaultSscMode\": \"SSC_MODE_1\"},\"5gQosProfile\": {\"5qi\": 9,\"arp\":{\"priorityLevel\": 1,\"preemptCap\": \"NOT_PREEMPT\",\"preemptVuln\":\"NOT_PREEMPTABLE\"},\"priorityLevel\":1},\"sessionAmbr\":{\"uplink\":\"100Mbps\", \"downlink\":\"100Mbps\"}}}');
+
+INSERT INTO `SmfSelectionSubscriptionData` (`ueid`, `servingPlmnid`, `subscribedSnssaiInfos`) VALUES ('208950000007488', '20895', '{\"S-NSSAI\": {\"dnnInfos\": [{\"dnn\": \"oai\"}]}}');
+
+
 COMMIT;
+
+
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

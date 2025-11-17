@@ -90,8 +90,8 @@ services:
             - 80/tcp
             - 8080/tcp
             - 38412/sctp
-        ports:
-            - "38412:38412/sctp"
+        ports:   
+            - "38412:38412/sctp"  # NGAP 를 위한 SCTP 포트 매핑
         volumes:
             - ./conf/basic_nrf_config.yaml:/openair-amf/etc/config.yaml
         environment:

@@ -1,0 +1,453 @@
+{
+  "analysis": {
+    "title": "OAI CN5G SMF session_ambr Implementation Analysis",
+    "version": "1.0",
+    "date": "2025-12-12",
+    "target": "OpenAirInterface 5G Core Network v2.2.0",
+    "repository": "https://gitlab.eurecom.fr/oai/cn5g/oai-cn5g-smf"
+  },
+  
+  "data_structures": {
+    "session_ambr": {
+      "definition": "Session Aggregate Maximum Bit Rate - 세션별 최대 집계 비트레이트",
+      "components": {
+        "session_ambr_ul": {
+          "name": "Uplink AMBR",
+          "description": "세션의 업링크 최대 비트레이트",
+          "unit": "bps (bits per second)",
+          "examples": ["50Mbps", "100Mbps", "200Mbps", "1000Mbps"]
+        },
+        "session_ambr_dl": {
+          "name": "Downlink AMBR",
+          "description": "세션의 다운링크 최대 비트레이트",
+          "unit": "bps (bits per second)",
+          "examples": ["100Mbps", "200Mbps", "400Mbps", "1000Mbps"]
+        }
+      },
+      "locations": {
+        "nas_format": {
+          "class": "oai::nas::SessionAmbr",
+          "header": "src/smf_app/SessionAmbr.hpp",
+          "usage": "UE로 NAS 메시지 전송 시 사용"
+        },
+        "pfcp_format": {
+          "struct": "session_ambr_t",
+          "header": "src/pfcp/msg_pfcp.hpp",
+          "standard": "3GPP TS 29.244",
+          "usage": "UPF로 PFCP 메시지 전송 시 사용"
+        },
+        "database": {
+          "table": "subscription_data",
+          "columns": ["ue_ambr_ul", "ue_ambr_dl", "aggregate_ambr_ul", "aggregate_ambr_dl"],
+          "file": "charts/oai-5g-core/mysql/initialization/oai_db-mini.sql"
+        }
+      }
+    },
+    "qos_profile": {
+      "definition": "QoS 프로필 - DNN별 QoS 설정",
+      "fields": {
+        "5qi": "5QI (5G QoS Identifier)",
+        "session_ambr_ul": "업링크 최대 비트레이트",
+        "session_ambr_dl": "다운링크 최대 비트레이트",
+        "priority": "우선 순위",
+        "arp_priority": "할당/보유 우선순위",
+        "arp_preempt_capability": "선제거(Preemption) 가능성",
+        "arp_preempt_vulnerability": "선제거 취약성"
+      }
+    }
+  },
+
+  "yaml_parsing": {
+    "configuration_files": [
+      {
+        "path": "docker-compose/conf/basic_nrf_config.yaml",
+        "sections": ["smf.local_subscription_infos"],
+        "parsing_function": "smf_config_parser()",
+        "target_structure": "dnn_configuration_t"
+      },
+      {
+        "path": "charts/e2e_scenarios/*/config.yaml",
+        "sections": ["smf.local_subscription_infos"],
+        "type": "E2E 시나리오"
+      },
+      {
+        "path": "test/template/template_config.yaml",
+        "sections": ["smf.local_subscription_infos"],
+        "type": "테스트 템플릿"
+      }
+    ],
+    "parsing_flow": [
+      "1. YAML 파일 로드",
+      "2. local_subscription_infos 섹션 파싱",
+      "3. snssai + dnn 키로 DNN 설정 조회",
+      "4. qos_profile에서 session_ambr_ul/dl 추출",
+      "5. 값 변환 (문자열 'XXXMbps' → 정수 bps)",
+      "6. dnn_configurations 맵에 저장",
+      "7. PDU Session 생성 시 참조"
+    ],
+    "value_conversion": {
+      "example": "200Mbps → 200,000,000 bps",
+      "format": "(숫자)(단위) → (숫자 * 1,000,000) bps",
+      "supported_units": ["bps", "Kbps", "Mbps", "Gbps"]
+    }
+  },
+
+  "pfcp_n4_interface": {
+    "description": "PFCP (Packet Forwarding Control Protocol) - SMF와 UPF 간의 제어 메시지",
+    "session_establishment": {
+      "message_type": "PFCP Session Establishment Request",
+      "protocol": "3GPP TS 29.244",
+      "transport": "UDP Port 8805",
+      "contents": {
+        "session_ambr": {
+          "field": "QER (QoS Enforcement Rule)",
+          "components": {
+            "qer_id": "QER 식별자",
+            "qfi": "QoS Flow ID",
+            "mbr": {
+              "mbr_ul": "Maximum Bit Rate - Uplink",
+              "mbr_dl": "Maximum Bit Rate - Downlink",
+              "source": "session_ambr_ul/dl"
+            },
+            "gate_status": {
+              "ul_gate": "Uplink 게이트 상태 (OPEN/CLOSED)",
+              "dl_gate": "Downlink 게이트 상태 (OPEN/CLOSED)"
+            }
+          }
+        },
+        "other_fields": [
+          "PDR (Packet Detection Rule)",
+          "FAR (Forwarding Action Rule)",
+          "URR (Usage Report Rule)",
+          "Created PDR"
+        ]
+      }
+    },
+    "encoding": {
+      "standard": "3GPP TS 29.244",
+      "bit_rate_unit": "64 kbps",
+      "example": {
+        "value": "200 Mbps",
+        "conversion": "200,000,000 / 64,000 = 3,125",
+        "encoding": "Use optimal unit based on value"
+      }
+    },
+    "functions": {
+      "send": "send_pfcp_session_establishment_request()",
+      "file": "src/smf_app/smf_n4.cpp",
+      "parameters": [
+        "upf_host",
+        "session_ambr_t (ambr_ul, ambr_dl)",
+        "qers[]"
+      ]
+    }
+  },
+
+  "rate_limiting_mechanism": {
+    "overview": "UPF에서 session_ambr을 기반으로 실제 트래픽을 제한",
+    "implementation_options": [
+      {
+        "type": "VPP 기반",
+        "file": "oai-cn5g-upf-vpp",
+        "description": "Vector Packet Processing 사용, DPDK 기반",
+        "performance": "높은 처리량"
+      },
+      {
+        "type": "eBPF 기반",
+        "file": "oai-cn5g-upf (eBPF variant)",
+        "description": "커널 공간 처리, 낮은 지연시간",
+        "performance": "매우 높은 성능"
+      },
+      {
+        "type": "Simple Switch",
+        "file": "oai-cn5g-upf",
+        "description": "기본 구현, 테스트 용도",
+        "performance": "중간 성능"
+      }
+    ],
+    "algorithms": {
+      "token_bucket": {
+        "name": "Token Bucket Algorithm",
+        "description": "토큰 누적 및 소비 기반의 rate limiting",
+        "process": [
+          "1. 초 단위로 토큰 재충전 (MBR 크기만큼)",
+          "2. 패킷 전송 시 토큰 소비 (패킷 크기만큼)",
+          "3. 토큰 부족 시 패킷 드롭",
+          "4. 버킷 크기는 최대 1/8초치 누적"
+        ],
+        "formula": {
+          "tokens_per_second": "session_ambr_ul (bps) / 8",
+          "tokens_consumed": "packet_size (bytes)",
+          "max_bucket": "session_ambr_ul / 8000 (bytes)"
+        }
+      },
+      "leaky_bucket": {
+        "name": "Leaky Bucket Algorithm",
+        "description": "고정 크기 버킷에서 패킷을 일정 속도로 처리",
+        "process": [
+          "1. 고정 크기의 버킷 유지",
+          "2. 패킷을 버킷에 큐잉",
+          "3. 초당 MBR 속도로 처리",
+          "4. 버킷 오버플로우 시 드롭"
+        ]
+      }
+    },
+    "qer_structure": {
+      "qer_id": "QER 식별자",
+      "qfi": "QoS Flow ID (0~63)",
+      "mbr_ul": "최대 업링크 비트레이트 (bps)",
+      "mbr_dl": "최대 다운링크 비트레이트 (bps)",
+      "gate_status": {
+        "ul_gate": "OPEN, CLOSED",
+        "dl_gate": "OPEN, CLOSED"
+      },
+      "tokens": {
+        "tokens_ul": "현재 업링크 토큰",
+        "tokens_dl": "현재 다운링크 토큰"
+      },
+      "statistics": {
+        "bytes_forwarded": "전송된 바이트",
+        "bytes_dropped": "드롭된 바이트",
+        "packets_dropped": "드롭된 패킷 수"
+      }
+    },
+    "packet_processing_flow": [
+      "1. 패킷 수신 (GTP-U 헤더 포함)",
+      "2. GTP-U 헤더에서 QFI 추출",
+      "3. QER 테이블에서 QFI로 QER 검색",
+      "4. 시간 경과량 계산 및 토큰 재충전",
+      "5. 토큰이 패킷 크기 이상인지 확인",
+      "6a. YES: 토큰 소비하고 패킷 포워드",
+      "6b. NO: 패킷 드롭 및 통계 업데이트",
+      "7. 통계 기록 (URR)"
+    ]
+  },
+
+  "code_files": {
+    "gitlab_repository": "https://gitlab.eurecom.fr/oai/cn5g/oai-cn5g-smf",
+    "source_files": [
+      {
+        "file": "src/smf_app/smf_context.hpp",
+        "function": "get_session_ambr(oai::nas::SessionAmbr&, const snssai_t&, const std::string&)",
+        "purpose": "NAS 형식의 session_ambr 조회",
+        "type": "선언부"
+      },
+      {
+        "file": "src/smf_app/smf_context.hpp",
+        "function": "get_session_ambr(session_ambr_t&, const snssai_t&, const std::string&)",
+        "purpose": "PFCP 형식의 session_ambr 조회 (오버로딩)",
+        "type": "선언부"
+      },
+      {
+        "file": "src/smf_app/smf_context.cpp",
+        "function": "get_session_ambr()",
+        "purpose": "session_ambr 값 추출 및 반환",
+        "implementation_details": "DNN 구독 정보 검색 → QoS 프로필 조회 → session_ambr_ul/dl 추출"
+      },
+      {
+        "file": "src/smf_app/SessionAmbr.hpp",
+        "class": "SessionAmbr",
+        "methods": [
+          "encode() - NAS 메시지로 인코딩",
+          "decode() - NAS 메시지에서 디코딩",
+          "serialize() - 바이트 스트림으로 변환",
+          "set_ul_ambr() - UL AMBR 설정",
+          "set_dl_ambr() - DL AMBR 설정"
+        ]
+      },
+      {
+        "file": "src/pfcp/msg_pfcp.hpp",
+        "struct": "session_ambr_t",
+        "fields": [
+          "uint64_t ambr_ul",
+          "uint64_t ambr_dl",
+          "encode() - PFCP 메시지로 인코딩",
+          "decode() - PFCP 메시지에서 디코딩"
+        ]
+      },
+      {
+        "file": "src/pfcp/pfcp_session.hpp",
+        "class": "pfcp_session",
+        "purpose": "PFCP 세션 관리"
+      },
+      {
+        "file": "src/pfcp/pfcp_session.cpp",
+        "function": "create_session(const session_ambr_t&, const std::vector<qer_t>&)",
+        "purpose": "PFCP 세션 생성 및 QER 설정",
+        "steps": [
+          "QER 객체 생성",
+          "session_ambr 값을 MBR_UL/DL로 설정",
+          "Gate Status 초기화",
+          "Rate Limiter 파라미터 설정"
+        ]
+      },
+      {
+        "file": "src/smf_app/smf_n4.cpp",
+        "function": "send_pfcp_session_establishment_request(const std::string&, const session_ambr_t&, const std::vector<qer_t>&)",
+        "purpose": "PFCP 메시지를 UPF로 전송",
+        "steps": [
+          "PFCP 메시지 객체 생성",
+          "QER 추가 (session_ambr 포함)",
+          "메시지 인코딩",
+          "UDP 송신 (N4 인터페이스, 포트 8805)"
+        ]
+      },
+      {
+        "file": "src/smf_app/smf_pfcp_association.cpp",
+        "function": "establish_pfcp_association()",
+        "purpose": "SMF와 UPF 간 PFCP 연결 설정"
+      },
+      {
+        "file": "src/common/3gpp_29.244.hpp",
+        "purpose": "3GPP TS 29.244 표준 구현",
+        "content": "PFCP 메시지 구조, QER, FAR, PDR 등"
+      }
+    ],
+    "configuration_parsing": [
+      {
+        "file": "src/smf_app/smf_config.cpp",
+        "function": "parse_yaml_config()",
+        "purpose": "YAML 파일 파싱"
+      },
+      {
+        "file": "src/smf_app/smf_app.cpp",
+        "function": "initialize_local_subscription_infos()",
+        "purpose": "로컬 구독 정보 초기화"
+      }
+    ],
+    "database": [
+      {
+        "file": "charts/oai-5g-core/mysql/initialization/oai_db-mini.sql",
+        "table": "subscription_data",
+        "columns": [
+          "ue_ambr_ul - UE 업링크 AMBR",
+          "ue_ambr_dl - UE 다운링크 AMBR",
+          "aggregate_ambr_ul - 집계 업링크 AMBR",
+          "aggregate_ambr_dl - 집계 다운링크 AMBR"
+        ]
+      }
+    ]
+  },
+
+  "configuration_examples": {
+    "embb_slice": {
+      "use_case": "Enhanced Mobile Broadband",
+      "snssai": { "sst": 1, "sd": "FFFFFF" },
+      "dnn": "oai",
+      "session_ambr_ul": "200Mbps",
+      "session_ambr_dl": "400Mbps",
+      "characteristics": ["높은 대역폭", "비디오 스트리밍", "대용량 파일 전송"]
+    },
+    "urllc_slice": {
+      "use_case": "Ultra-Reliable Low-Latency Communication",
+      "snssai": { "sst": 3, "sd": "000003" },
+      "dnn": "critical",
+      "session_ambr_ul": "10Mbps",
+      "session_ambr_dl": "10Mbps",
+      "characteristics": ["낮은 대역폭", "극저 지연시간", "산업용 IoT"]
+    },
+    "mmtc_slice": {
+      "use_case": "Massive Machine-Type Communication",
+      "snssai": { "sst": 2, "sd": "000002" },
+      "dnn": "iot",
+      "session_ambr_ul": "1Mbps",
+      "session_ambr_dl": "2Mbps",
+      "characteristics": ["매우 낮은 대역폭", "많은 동시 연결", "센서 네트워크"]
+    }
+  },
+
+  "3gpp_standards": {
+    "29_244": {
+      "title": "PFCP (Packet Forwarding Control Protocol)",
+      "relevance": "session_ambr의 N4 인터페이스 전송 방식",
+      "sections": [
+        "8.2.40 - QER (QoS Enforcement Rule)",
+        "8.2.40.2 - MBR (Maximum Bit Rate)",
+        "8.2.40.3 - GBR (Guaranteed Bit Rate)"
+      ]
+    },
+    "29_502": {
+      "title": "SMF Service-Based Interface",
+      "relevance": "session_ambr의 NAS 메시지 포함",
+      "api": [
+        "CreateSMContext - PDU Session 생성",
+        "UpdateSMContext - PDU Session 수정",
+        "ReleaseSMContext - PDU Session 해제"
+      ]
+    },
+    "24_501": {
+      "title": "NAS 5GSM (5G Session Management)",
+      "relevance": "session_ambr의 UE 전송 형식",
+      "messages": [
+        "PDU Session Establishment Accept",
+        "PDU Session Modification Command",
+        "Session AMBR IE (Information Element)"
+      ]
+    }
+  },
+
+  "monitoring_and_troubleshooting": {
+    "log_commands": [
+      "docker logs oai-smf | grep -i 'session_ambr|AMBR|QER'",
+      "docker logs oai-upf | grep -i 'rate_limit|mbr|qer'",
+      "tcpdump -i eth0 -n udp port 8805"
+    ],
+    "common_issues": [
+      {
+        "problem": "트래픽 제한이 작동하지 않음",
+        "causes": ["UPF의 QER 미설정", "PFCP 메시지 전송 실패"],
+        "solutions": ["PFCP 메시지 캡처 및 검증", "UPF 로그 확인", "QER 설정 재점검"]
+      },
+      {
+        "problem": "예상보다 낮은 처리량",
+        "causes": ["AMBR 값 과소 설정", "Rate Limiter 과도 설정"],
+        "solutions": ["설정 파일 검증", "DNN 구독 정보 확인", "토큰 버킷 파라미터 조정"]
+      },
+      {
+        "problem": "특정 DNN만 제한되지 않음",
+        "causes": ["선택적 YAML 파일 오류", "DNN 이름 불일치"],
+        "solutions": ["YAML 구문 검증", "DNN 이름 대소문자 확인", "SMF 재시작"]
+      }
+    ]
+  },
+
+  "performance_characteristics": {
+    "token_bucket": {
+      "advantage": ["정밀한 제어", "버스트 트래픽 허용"],
+      "disadvantage": ["메모리 오버헤드", "복잡한 구현"],
+      "latency": "< 10 μs per packet"
+    },
+    "leaky_bucket": {
+      "advantage": ["균일한 처리", "간단한 구현"],
+      "disadvantage": ["버스트 트래픽 제한", "지연 시간 가변적"],
+      "latency": "< 5 μs per packet"
+    },
+    "ebpf": {
+      "advantage": ["극저 지연시간", "높은 처리량"],
+      "disadvantage": ["복잡한 개발", "커널 버전 의존"],
+      "throughput": "> 10 Gbps per core"
+    }
+  },
+
+  "summary": {
+    "key_findings": [
+      "session_ambr은 YAML 설정에서 snssai와 dnn별로 정의된다",
+      "SMF가 session_ambr을 NAS (UE용)와 PFCP (UPF용) 두 가지 형식으로 인코딩한다",
+      "UPF는 PFCP 메시지의 QER 내 MBR 정보로 실제 Rate Limiting을 수행한다",
+      "Rate Limiting은 Token Bucket 또는 eBPF 기반 알고리즘으로 구현된다",
+      "3GPP TS 29.244 표준을 따르며, 매우 정교한 QoS 제어가 가능하다"
+    ],
+    "critical_files": [
+      "src/smf_app/smf_context.hpp - session_ambr 함수 선언",
+      "src/smf_app/smf_context.cpp - session_ambr 함수 구현",
+      "src/pfcp/msg_pfcp.hpp - PFCP 메시지 구조",
+      "src/smf_app/smf_n4.cpp - PFCP 메시지 전송"
+    ],
+    "implementation_complexity": {
+      "overall": "높음 (High)",
+      "yaml_parsing": "낮음",
+      "pfcp_messaging": "중간",
+      "rate_limiting": "중간~높음"
+    }
+  }
+}

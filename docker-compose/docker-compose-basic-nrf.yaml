@@ -169,5 +169,8 @@ networks:
         ipam:
             config:
                 - subnet: 192.168.70.128/26
+                  gateway: 192.168.70.129  # ← 추가
         driver_opts:
             com.docker.network.bridge.name: "demo-oai"
+            com.docker.network.bridge.enable_ip_masquerade: "false"  # ← 추가
+            com.docker.network.bridge.enable_icc: "true"             # ← 추가

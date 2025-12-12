@@ -227,8 +227,8 @@ smf:
       dnn: "oai"
       qos_profile:
         5qi: 9
-        session_ambr_ul: "100Mbps"
-        session_ambr_dl: "100Mbps"
+        session_ambr_ul: "200Mbps"
+        session_ambr_dl: "200Mbps"
 
 upf:
   support_features:

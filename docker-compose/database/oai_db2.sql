@@ -434,7 +434,7 @@ INSERT INTO `AuthenticationSubscription` (`ueid`, `authenticationMethod`, `encPe
 
 INSERT INTO `AccessAndMobilitySubscriptionData` (`ueid`, `servingPlmnid`, `nssai`) VALUES ('208950000007488', '20895','{\"defaultSingleNssais\": [{\"sst\": 1, \"sd\": \"ffffff\"}]}');
 
-INSERT INTO `SessionManagementSubscriptionData` (`ueid`, `servingPlmnid`, `singleNssai`, `dnnConfigurations`) VALUES ('208950000007488', '20895', '{\"sst\": 1, \"sd\": \"ffffff\"}','{\"oai\":{\"pduSessionTypes\":{ \"defaultSessionType\": \"IPV4\"},\"sscModes\": {\"defaultSscMode\": \"SSC_MODE_1\"},\"5gQosProfile\": {\"5qi\": 9,\"arp\":{\"priorityLevel\": 1,\"preemptCap\": \"NOT_PREEMPT\",\"preemptVuln\":\"NOT_PREEMPTABLE\"},\"priorityLevel\":1},\"sessionAmbr\":{\"uplink\":\"100Mbps\", \"downlink\":\"100Mbps\"}}}');
+INSERT INTO `SessionManagementSubscriptionData` (`ueid`, `servingPlmnid`, `singleNssai`, `dnnConfigurations`) VALUES ('208950000007488', '20895', '{\"sst\": 1, \"sd\": \"ffffff\"}','{\"oai\":{\"pduSessionTypes\":{ \"defaultSessionType\": \"IPV4\"},\"sscModes\": {\"defaultSscMode\": \"SSC_MODE_1\"},\"5gQosProfile\": {\"5qi\": 9,\"arp\":{\"priorityLevel\": 1,\"preemptCap\": \"NOT_PREEMPT\",\"preemptVuln\":\"NOT_PREEMPTABLE\"},\"priorityLevel\":1},\"sessionAmbr\":{\"uplink\":\"100Mbps\", \"downlink\":\"100Mbps\"},\"staticIpAddress\":[{\"ipv4Addr\": \"12.1.1.130\"}]}}');
 
 INSERT INTO `SmfSelectionSubscriptionData` (`ueid`, `servingPlmnid`, `subscribedSnssaiInfos`) VALUES ('208950000007488', '20895', '{\"S-NSSAI\": {\"dnnInfos\": [{\"dnn\": \"oai\"}]}}');
 

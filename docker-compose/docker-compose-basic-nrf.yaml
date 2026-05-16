@@ -162,6 +162,24 @@ services:
 # For CI purposes, we are keeping the line commented
                 ipv4_address: 192.168.70.135
 
+    oai-ext-dn2:
+        privileged: true
+        init: true
+        container_name: oai-ext-dn2
+        image: oaisoftwarealliance/trf-gen-cn5g:latest
+        environment:
+            - UPF_FQDN=oai-upf
+            - UE_NETWORK=12.1.1.0/24
+            - USE_FQDN=yes
+        healthcheck:
+            test: /bin/bash -c "ip r | grep 12.1.1"
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        networks:
+            public_net:
+                ipv4_address: 192.168.70.139
+
 networks:
     public_net:
         driver: bridge

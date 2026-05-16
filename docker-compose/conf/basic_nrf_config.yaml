@@ -147,11 +147,11 @@ amf:
       amf_region_id: 01
       amf_set_id: 001
       amf_pointer: 01
-    - mcc: 001
-      mnc: 01
-      amf_region_id: 01
-      amf_set_id: 001
-      amf_pointer: 01
+#    - mcc: 001
+#      mnc: 01
+#      amf_region_id: 01
+#      amf_set_id: 001
+#      amf_pointer: 01
   plmn_support_list:
     - mcc: 208
       mnc: 95
@@ -181,9 +181,9 @@ smf:
       config:
         enable_usage_reporting: no
   ue_dns:
-    primary_ipv4: "172.21.3.100"
+    primary_ipv4: "8.8.8.8"
     primary_ipv6: "2001:4860:4860::8888"
-    secondary_ipv4: "8.8.8.8"
+    secondary_ipv4: "4.4.4.4"
     secondary_ipv6: "2001:4860:4860::8888"
   ims:
     pcscf_ipv4: "127.0.0.1"
